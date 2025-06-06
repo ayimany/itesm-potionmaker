@@ -219,7 +219,7 @@ auto enter_battle(player &the_player, const int stage) -> void {
   if (active_enemies.size() == 0) {
     double cash_reward = random_double(stage * 100.0, stage * 500.0);
     print_special("You have won this battle!");
-    print_special(std::format("You have won {} gold!", cash_reward));
+    print_special(std::format("You have won {:.2f} gold!", cash_reward));
     the_player.add_cash(cash_reward);
   }
 }
