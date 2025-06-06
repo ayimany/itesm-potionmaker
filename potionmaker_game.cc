@@ -302,7 +302,6 @@ auto create_potion(player &p) -> dynamic_array<ingredient *> {
     if (choice == 0) {
       is_done = true;
     } else if (!indices.contains(choice - 1)) {
-      std::cout << "Added index " << choice - 1 << std::endl;
       indices.add(choice - 1);
     }
   }

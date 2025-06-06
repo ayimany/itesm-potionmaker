@@ -130,7 +130,7 @@ auto entity::inspection_string() const -> std::string {
 player::player(const std::string_view name, const double max_health_,
                const double health, const double damage)
     : entity(name, element_type::boring, max_health_, health, damage),
-      ingredients_(0), cash_(0) {}
+      ingredients_(0), cash_(100) {}
 
 auto player::get_ingredients() -> dynamic_array<ingredient *> & {
   return ingredients_;
