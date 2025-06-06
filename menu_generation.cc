@@ -1,9 +1,9 @@
 #include "menu_generation.hh"
 
-#include <string>
-#include <iostream>
-#include <format>
 #include <cstdint>
+#include <format>
+#include <iostream>
+#include <string>
 
 namespace potmaker {
 auto print_option_menu(std::string const &title,
