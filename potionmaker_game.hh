@@ -2,6 +2,8 @@
 #define POTIONMAKER_HH
 #include "entity.hh"
 
+#include <string>
+
 namespace potmaker {
 
 auto main_menu(const std::string &player_name) -> void;

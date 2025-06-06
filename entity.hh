@@ -4,6 +4,10 @@
 #include "element_type.hh"
 #include "health_delta_inductor.hh"
 
+#include <cstdint>
+#include <string>
+#include <string_view>
+
 namespace potmaker {
 
 class status_effect;

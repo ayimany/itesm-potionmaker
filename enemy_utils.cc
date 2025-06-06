@@ -2,6 +2,9 @@
 
 #include "util.hh"
 
+#include <stdexcept>
+#include <string_view>
+
 namespace potmaker {
 
 auto constants::generate_enemy(const int stage) -> enemy * {

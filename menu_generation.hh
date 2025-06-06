@@ -5,6 +5,8 @@
 #include <bits/ostream.tcc>
 #include <format>
 #include <iostream>
+#include <string>
+#include <type_traits>
 
 namespace potmaker {
 

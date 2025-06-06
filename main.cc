@@ -2,6 +2,9 @@
 #include "menu_generation.hh"
 #include "potionmaker_game.hh"
 
+#include <iostream>
+#include <string>
+
 auto main() -> int {
   bool user_wants_to_exit = false;
 

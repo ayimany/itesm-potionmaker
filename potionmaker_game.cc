@@ -8,7 +8,11 @@
 #include "util.hh"
 
 #include <cmath>
+#include <format>
+#include <iostream>
 #include <sstream>
+#include <stdexcept>
+#include <string>
 
 namespace potmaker {
 

@@ -4,7 +4,10 @@
 #include "util.hh"
 
 #include <cmath>
+#include <cstdint>
+#include <format>
 #include <sstream>
+#include <string_view>
 
 namespace potmaker {
 entity::entity(const std::string_view name, const element_type element,

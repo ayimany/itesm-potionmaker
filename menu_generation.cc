@@ -1,5 +1,10 @@
 #include "menu_generation.hh"
 
+#include <string>
+#include <iostream>
+#include <format>
+#include <cstdint>
+
 namespace potmaker {
 auto print_option_menu(std::string const &title,
                        dynamic_array<std::string> const &options) -> void {

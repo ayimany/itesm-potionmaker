@@ -2,6 +2,7 @@
 #define DYNAMIC_ARRAY_HH
 
 #include <algorithm>
+#include <cstddef>
 #include <format>
 #include <functional>
 #include <initializer_list>
