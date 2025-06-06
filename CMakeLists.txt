@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.31)
-project(fuit_farm_2)
+project(potion-maker)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(fuit_farm_2 main.cpp
+add_executable(fuit_farm_2 main.cc
         ingredient.cc
         ingredient.hh
         entity.cc
