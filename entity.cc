@@ -33,6 +33,17 @@ auto entity::on_turn_run() -> void {
   }
 
   status_effects_.remove_bulk_indices(ticked_out_effects);
+
+  bool frozen = false;
+  for (const status_effect *effect : status_effects_) {
+    if (effect->element() == element_type::ice) {
+      frozen = true;
+    }
+  }
+
+  if (!frozen) {
+    skips_turn_ = false;
+  }
 }
 
 auto entity::name() const -> std::string_view { return name_; }
@@ -53,7 +64,7 @@ auto entity::modify_health(health_delta_inductor *inductor, const double amount)
   if (result < 0) {
     print_action(std::format("{} has been hurt ({:.2f} HP) by {}", name_,
                              result, inductor->inductor_display_string()));
-  } else {
+  } else if (result > 0) {
     print_action(std::format("{} has been healed ({:.2f} HP) by {}", name_,
                              result, inductor->inductor_display_string()));
   }
