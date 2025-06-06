@@ -1,6 +1,8 @@
 #ifndef ELEMENT_HH
 #define ELEMENT_HH
 
+#include <string_view>
+
 enum class element_type : int {
   fire,
   ice,

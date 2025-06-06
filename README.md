@@ -4,17 +4,37 @@ The one and only original Potion Maker. This is a university project
 
 ## BUILDING THE PROJECT
 
-If you are going to evaluate my project you probably care about this part the most.
+If you are going to evaluate my project you probably care about this part
+the most. Compile it by shoving all the `.cc` (and `.hh` if you want to
+precompile those) files into your preferred compiler, making sure
+that you are **compiling under C++20**.
 
 ### Method 1: Globbing or Manual
 
-```
-g++ -std=c++20 enemy_utils.cc entity.cc ingredient.cc ingredient_utils.cc menu_generation.cc potionmaker_game.cc status_effect.cc util.cc
+```shell
+# Globbing
+g++ -std=c++20 *.cc
+# or
+g++ -std=c++20 *.cc *.hh
+
+# Manual, beautifully listed out
+g++ -std=c++20 enemy_utils.cc entity.cc ingredient.cc ingredient_utils.cc menu_generation.cc potionmaker_game.cc status_effect.cc util.cc main.cc
+# or
+g++ -std=c++20 enemy_utils.cc entity.cc ingredient.cc ingredient_utils.cc main.cc menu_generation.cc potionmaker_game.cc status_effect.cc util.cc dynamic_array.hh element_type.hh enemy_utils.hh entity.hh health_delta_inductor.hh ingredient.hh ingredient_utils.hh menu_generation.hh potionmaker_game.hh status_effect.hh util.hh
+
 ```
 
 ### Method 2: CMake
 
-I might as well marry CMake. If we're on the same page and you have CMake Installed, run:
+If you're like me, and you feel like CMake is simultaneously the worst and
+best thing that has happened to C++ then you probably have it insalled.
+
+```shell
+# Unix Based because I actually have no idea how CMake operates on NT
+mkdir build && cd build
+cmake ..
+make || ninja || # whichever you use
+```
 
 ## What is it?
 
