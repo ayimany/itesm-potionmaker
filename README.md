@@ -56,4 +56,5 @@ Can't say the same about memory though (Of course, I am joking).
 ## UML Diagram
 
 Mmmh, standards
+![UML Diagram](UML-Diagram.png)
 
