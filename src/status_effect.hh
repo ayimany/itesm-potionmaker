@@ -4,6 +4,7 @@
 #include "element_type.hh"
 #include "util.hh"
 #include <sstream>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <variant>

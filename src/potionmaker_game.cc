@@ -6,6 +6,10 @@
 #include <format>
 #include <iostream>
 #include <limits>
+#include <ranges>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace potmaker {
 

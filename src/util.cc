@@ -1,6 +1,7 @@
 #include "util.hh"
 #include <iostream>
 #include <random>
+#include <string>
 #include <utility>
 
 namespace potmaker {

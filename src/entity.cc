@@ -5,8 +5,10 @@
 #include <cmath>
 #include <cstdint>
 #include <format>
-#include <sstream>
-#include <string_view>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace potmaker {
     entity::entity(std::string name, const element_type element,

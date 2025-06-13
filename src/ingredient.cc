@@ -2,11 +2,11 @@
 #include "entity.hh"
 #include "status_effect.hh"
 #include "util.hh"
-#include <cmath>
 #include <cstdint>
 #include <format>
+#include <sstream>
+#include <stdexcept>
 #include <string>
-#include <string_view>
 
 namespace potmaker {
 

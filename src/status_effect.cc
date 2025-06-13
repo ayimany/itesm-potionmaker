@@ -2,7 +2,6 @@
 #include "entity.hh"
 #include "util.hh"
 #include <cmath>
-#include <complex>
 #include <cstdint>
 #include <format>
 #include <string>
