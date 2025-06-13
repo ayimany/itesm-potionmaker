@@ -9,6 +9,10 @@
 
 namespace potmaker {
 
+    shop_item::shop_item(ingredient* ing, const double cost)
+        : item(ing), price(cost)
+    {}
+
     game_state::game_state(std::string player_name)
         : player_(new player(std::move(player_name), 100.0, 15.0, 50.0)),
           current_stage_(1), game_running_(true)
@@ -16,6 +20,7 @@ namespace potmaker {
         generate_shop_items();
     }
 
+    // We allocate several objects, so we need to perform cleanup
     game_state::~game_state()
     {
         delete player_;
@@ -25,25 +30,26 @@ namespace potmaker {
 
     auto game_state::cleanup_ingredients() -> void
     {
-        for (auto* ing: owned_ingredients_) { delete ing; }
+        for (const auto* ing: owned_ingredients_) { delete ing; }
         owned_ingredients_.clear();
 
-        for (auto& shop_item: shop_items_) { delete shop_item.item; }
+        for (const auto& shop_item: shop_items_) { delete shop_item.item; }
         shop_items_.clear();
     }
 
     auto game_state::cleanup_enemies() -> void
     {
-        for (auto* enemy: owned_enemies_) { delete enemy; }
+        for (const auto* enemy: owned_enemies_) { delete enemy; }
         owned_enemies_.clear();
     }
 
     auto game_state::run() -> void
     {
-        print_divider("WELCOME TO POTIONMAKER!");
-        std::cout << "A mystical adventure awaits, " << player_->name()
+        print_divider("WELCOME!");
+        std::cout << "An adventure awaits. Get ready, " << player_->name()
                   << "!\n\n";
 
+        // "main loop" of the engine
         while (game_running_) { main_menu(); }
     }
 
@@ -55,7 +61,7 @@ namespace potmaker {
         std::cout << "3. Quit\n";
         std::cout << "Choose an option: ";
 
-        int choice = get_user_choice(1, 3);
+        const int choice = get_user_choice(1, 3);
 
         switch (choice) {
         case 1:
@@ -65,9 +71,11 @@ namespace potmaker {
             credits();
             break;
         case 3:
-            std::cout << "Thanks for playing Potionmaker!\n";
+            std::cout << "Thanks for playing!\n";
             game_running_ = false;
             break;
+        default:
+            throw std::runtime_error("Invalid [impossible @ main_menu]");
         }
     }
 
@@ -85,7 +93,7 @@ namespace potmaker {
             std::cout << "4. Return to Main Menu\n";
             std::cout << "Choose an option: ";
 
-            int choice = get_user_choice(1, 4);
+            const int choice = get_user_choice(1, 4);
 
             switch (choice) {
             case 1:
@@ -100,6 +108,8 @@ namespace potmaker {
             case 4:
                 in_game = false;
                 break;
+            default:
+                throw std::runtime_error("Invalid [impossible @ start_game]");
             }
         }
     }
@@ -115,18 +125,20 @@ namespace potmaker {
 
         std::cout << "\n1. Attack with Potion\n";
         std::cout << "2. Basic Attack\n";
-        std::cout << "3. Run Away\n";
+        std::cout << "3. Surrender\n";
         std::cout << "Choose an action: ";
 
-        int choice = get_user_choice(1, 3);
+        const int choice = get_user_choice(1, 3);
 
+        bool surrendered = false;
         if (choice == 3) {
-            std::cout << "You flee from the battle!\n";
+            std::cout << "You surrender at the will of your foes.\n";
             cleanup_enemies();
-            return;
+            surrendered = true;
         }
 
-        bool battle_won = fight_round(enemies, choice);
+        const bool battle_won
+                = surrendered ? false : fight_round(enemies, choice);
 
         if (battle_won) {
             double gold_reward = calculate_gold_reward(enemies);
@@ -136,16 +148,15 @@ namespace potmaker {
                                      gold_reward));
             current_stage_++;
 
+            // Little reward
             if (current_stage_ % 3 == 0) {
-                print_special("You feel stronger from your victories!");
-                // Small stat boost every 3 stages
-                player_->modify_health(10);
+                print_special("You feel stronger.");
+                player_->modify_health(25);
             }
         }
         else {
-            print_action("You have been defeated!");
-            std::cout << "Game Over! You reached stage " << current_stage_
-                      << "\n";
+            print_action("DEFEAT");
+            std::cout << "You reached stage " << current_stage_ << "\n";
             game_running_ = false;
         }
 
@@ -156,14 +167,15 @@ namespace potmaker {
     {
         bool in_shop = true;
 
+        // Shop loop
         while (in_shop) {
-            print_divider("MYSTICAL SHOP");
+            print_divider("INGREDIENT SHOP");
             std::cout << "Gold: " << player_->gold() << "\n\n";
 
             display_shop();
 
             std::cout << "\nEnter item number to buy (0 to return): ";
-            int choice
+            const int choice
                     = get_user_choice(0, static_cast<int>(shop_items_.size()));
 
             if (choice == 0) { in_shop = false; }
@@ -181,12 +193,16 @@ namespace potmaker {
     auto game_state::credits() -> void
     {
         print_divider("CREDITS");
-        std::cout << "Potionmaker - A Text Adventure Game\n\n";
-        std::cout << "Created by: [Your Name Here]\n";
-        std::cout << "Engine: C++ with custom game framework\n";
-        std::cout << "Special thanks to: DeepSeek AI for ingredient and enemy "
-                     "names\n\n";
-        std::cout << "Thank you for playing!\n\n";
+        std::cout << "Potionmaker: A Text RPG\n\n";
+        std::cout << "Created by: Diego Pasaye, A01708525\n";
+        std::cout << "Special thanks to deepseek for giving enemy name ideas\n";
+        std::cout
+                << "I remade this project 3 times and refactored it entirely "
+                   "once just because I didn't like it. I am really tired. I "
+                   "may have gone a bit overboard. "
+                   "I scream internally every time I see my friends' projects. "
+                   "I could have made this so much simpler. I may need a "
+                   "therapist.\n";
         std::cout << "Press Enter to continue...";
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     }
@@ -195,16 +211,17 @@ namespace potmaker {
     {
         std::vector<enemy*> enemies;
 
-        // Number of enemies increases with stage
-        int enemy_count = 1 + (current_stage_ - 1) / 2;
-        enemy_count = std::min(enemy_count, 4); // Cap at 4 enemies
+        // Stage Increases -> Enemies Increase
+        const int enemy_count = 1 + (current_stage_ - 1) / 2;
 
         for (int i = 0; i < enemy_count; ++i) {
-            auto* new_enemy = create_random_enemy(current_stage_);
+            enemy* new_enemy = create_random_enemy(current_stage_);
             enemies.push_back(new_enemy);
             owned_enemies_.push_back(new_enemy);
         }
 
+        // Cleanup happens elsewhere.
+        // We delegate cleanup responsibility to cleanup methods in this class
         return enemies;
     }
 
@@ -221,7 +238,7 @@ namespace potmaker {
     auto game_state::create_potion() -> std::vector<ingredient*>
     {
         std::vector<ingredient*> potion;
-        auto& inventory = player_->stored_ingredients();
+        std::vector<ingredient*>& inventory = player_->stored_ingredients();
         std::vector<int> selected_indices;
 
         if (inventory.empty()) {
@@ -236,20 +253,19 @@ namespace potmaker {
 
         while (true) {
             std::cout << "Add ingredient (0 to finish): ";
-            int choice = get_user_choice(0, static_cast<int>(inventory.size()));
+            const int choice
+                    = get_user_choice(0, static_cast<int>(inventory.size()));
 
             if (choice == 0) break;
 
-            // Check if already selected
             int actual_index = choice - 1;
-            if (std::find(selected_indices.begin(), selected_indices.end(),
-                          actual_index)
+            if (std::ranges::find(selected_indices, actual_index)
                 != selected_indices.end()) {
                 std::cout << "You already selected that ingredient!\n";
                 continue;
             }
 
-            auto* selected = inventory[actual_index];
+            ingredient* selected = inventory[actual_index];
             potion.push_back(selected);
             selected_indices.push_back(actual_index);
 
@@ -261,10 +277,9 @@ namespace potmaker {
             }
         }
 
-        // Remove selected ingredients from inventory (in reverse order to
-        // maintain indices)
+        // Remove ingredients
         std::sort(selected_indices.rbegin(), selected_indices.rend());
-        for (int index: selected_indices) {
+        for (const int index: selected_indices) {
             inventory.erase(inventory.begin() + index);
         }
 
@@ -272,26 +287,27 @@ namespace potmaker {
     }
 
     auto game_state::apply_potion(const std::vector<ingredient*>& potion,
-                                  std::vector<enemy*>& enemies) -> void
+                                  const std::vector<enemy*>& enemies) -> void
     {
         if (potion.empty()) {
-            std::cout << "You throw an empty bottle! Nothing happens.\n";
+            std::cout << "You throw an empty bottle! Nothing happens. Consider "
+                         "doing a basic attack.\n";
             return;
         }
 
-        // Choose target enemy
+        // Target choosing
         std::cout << "\nChoose your target:\n";
         display_enemies(enemies);
         std::cout << "Target enemy (1-" << enemies.size() << "): ";
 
-        int target_choice
+        const int target_choice
                 = get_user_choice(1, static_cast<int>(enemies.size()));
         enemy* target = enemies[target_choice - 1];
 
         print_action(
                 std::format("You throw your potion at {}!", target->name()));
 
-        // Apply each ingredient to the chosen enemy
+        // Every ingredient applies an effect on the target
         for (auto* ingredient: potion) {
             std::cout << "\n" << ingredient->name() << " activates!\n";
             if (!target->is_dead()) { ingredient->on_applied(*target); }
@@ -303,42 +319,46 @@ namespace potmaker {
     {
         std::cout << "\n=== YOUR TURN ===\n";
 
-        if (attack_type == 1) { // Potion attack
-            auto& inventory = player_->stored_ingredients();
+        // The player uses a potion but mr has-no-ingredients has no ingredients
+        if (attack_type == 1) {
+            const std::vector<ingredient*>& inventory
+                    = player_->stored_ingredients();
 
             if (inventory.empty()) {
                 std::cout << "You have no ingredients to make a potion!\n";
                 std::cout << "1. Basic Attack\n";
-                std::cout << "2. Run Away\n";
+                std::cout << "2. Do nothing\n";
                 std::cout << "Choose an action: ";
 
-                int fallback_choice = get_user_choice(1, 2);
+                const int fallback_choice = get_user_choice(1, 2);
                 if (fallback_choice == 2) {
-                    std::cout << "You flee from the battle!\n";
-                    return false; // Signal to end battle
+                    std::cout << "You do nothing.";
+                    return false;
                 }
                 basic_attack(enemies);
             }
             else {
-                auto potion = create_potion();
+                const std::vector<ingredient*> potion = create_potion();
                 apply_potion(potion, enemies);
             }
         }
-        else if (attack_type == 2) { // Basic attack
+        else if (attack_type == 2) {
             basic_attack(enemies);
         }
 
+        // Clean up allocated enemies
         cleanup_dead_enemies(enemies);
         return enemies.empty();
     }
 
-    auto game_state::enemy_turn(std::vector<enemy*>& enemies) -> void
+    auto game_state::enemy_turn(std::vector<enemy*>& enemies) const -> void
     {
         std::cout << "\n=== ENEMY TURN ===\n";
 
         for (auto* enemy: enemies) {
             if (!enemy->is_dead()) {
-                enemy->tick(); // Apply status effects
+                enemy->tick();
+                // Skip turn if dead or frozen
                 if (!enemy->is_dead() && !enemy->is_frozen()) {
                     enemy->act(*player_, enemies);
                 }
@@ -348,14 +368,14 @@ namespace potmaker {
         cleanup_dead_enemies(enemies);
     }
 
-    auto game_state::basic_attack(std::vector<enemy*>& enemies) -> void
+    auto game_state::basic_attack(const std::vector<enemy*>& enemies) -> void
     {
-        // Choose target enemy
+        // Probably should have abstracted this out
         std::cout << "\nChoose your target:\n";
         display_enemies(enemies);
         std::cout << "Target enemy (1-" << enemies.size() << "): ";
 
-        int target_choice
+        const int target_choice
                 = get_user_choice(1, static_cast<int>(enemies.size()));
         enemy* target = enemies[target_choice - 1];
 
@@ -368,23 +388,17 @@ namespace potmaker {
     auto game_state::fight_round(std::vector<enemy*>& enemies,
                                  int initial_attack_type) -> bool
     {
-        bool player_chose_to_flee = false;
-        while (!enemies.empty() && !player_->is_dead()
-               && !player_chose_to_flee) {
-            // Player turn
-            bool player_won = player_turn(enemies, initial_attack_type);
+        bool player_surrendered = false;
+        while (!enemies.empty() && !player_->is_dead() && !player_surrendered) {
+            // Simple battle loop: Player -> Enemy -> Tick Effects -> Restart
+            const bool player_won = player_turn(enemies, initial_attack_type);
             if (player_won) { return true; }
-            // Check if player chose to flee (enemies would be empty but in a
-            // different way)
             if (enemies.empty()) { return true; }
 
-            // Enemy turn
             enemy_turn(enemies);
 
-            // Player status effects
             player_->tick();
 
-            // Display status
             std::cout << "\n--- STATUS ---\n";
             std::cout << std::format("{}: {:.1f}/{:.1f} HP\n", player_->name(),
                                      player_->health(), player_->max_health());
@@ -394,19 +408,19 @@ namespace potmaker {
                 display_enemies(enemies);
             }
 
-            // For subsequent turns, give player choice again
+            // Ask again
             if (!enemies.empty() && !player_->is_dead()) {
                 std::cout << "\n=== CHOOSE YOUR ACTION ===\n";
                 std::cout << "1. Attack with Potion\n";
                 std::cout << "2. Basic Attack\n";
-                std::cout << "3. Run Away\n";
+                std::cout << "3. Surrender\n";
                 std::cout << "Choose an action: ";
 
-                int choice = get_user_choice(1, 3);
+                const int choice = get_user_choice(1, 3);
 
                 if (choice == 3) {
-                    std::cout << "You flee from the battle!\n";
-                    player_chose_to_flee = true;
+                    std::cout << "You surrender before your enemies.\n";
+                    player_surrendered = true;
                     return false;
                 }
 
@@ -414,7 +428,7 @@ namespace potmaker {
             }
         }
 
-        return !player_->is_dead() && !player_chose_to_flee;
+        return !player_->is_dead() && !player_surrendered;
     }
 
     auto game_state::cleanup_dead_enemies(std::vector<enemy*>& enemies) -> void
@@ -428,44 +442,43 @@ namespace potmaker {
         for (const auto& item: shop_items_) { delete item.item; }
         shop_items_.clear();
 
-        // Generate 6-8 random items
-        int item_count = random_int(6, 8);
+        // Generate other random items
+        const int item_count = random_int(6, 8);
 
         for (int i = 0; i < item_count; ++i) {
-            auto* ingredient = create_random_ingredient(1, current_stage_ + 1);
-            double price
-                    = 10.0 + (ingredient->potency() * random_double(8.0, 15.0));
-            shop_items_.emplace_back(ingredient, price);
+            ingredient* ing = create_random_ingredient(1, current_stage_ + 1);
+            double price = 10.0 + (ing->potency() * random_double(8.0, 15.0));
+            shop_items_.emplace_back(ing, price);
         }
     }
 
-    auto game_state::display_shop() -> void
+    auto game_state::display_shop() const -> void
     {
+        // Take shop items and show them to the player
         std::cout << "Available Items:\n";
         for (size_t i = 0; i < shop_items_.size(); ++i) {
-            const auto& item = shop_items_[i];
+            const shop_item& item = shop_items_[i];
             std::cout << std::format("{}. {} (Potency: {}) - {:.1f} gold\n",
                                      i + 1, item.item->name(),
                                      item.item->potency(), item.price);
         }
     }
 
-    auto game_state::buy_item(int index) -> bool
+    auto game_state::buy_item(const int index) -> bool
     {
         if (index < 0 || index >= static_cast<int>(shop_items_.size())) {
             return false;
         }
 
-        const auto& item = shop_items_[index];
+        const shop_item& item = shop_items_[index];
         if (player_->gold() >= item.price) {
             player_->remove_gold(item.price);
             player_->store_ingredient(item.item);
 
-            // Remove from shop and regenerate
+            // Replace bought item
             shop_items_.erase(shop_items_.begin() + index);
 
-            // Add a new item to keep shop stocked
-            auto* new_ingredient
+            ingredient* new_ingredient
                     = create_random_ingredient(1, current_stage_ + 1);
             double price
                     = 10.0
@@ -490,7 +503,7 @@ namespace potmaker {
                                  player_->stored_ingredients().size());
     }
 
-    auto game_state::display_inventory() -> void
+    auto game_state::display_inventory() const -> void
     {
         std::cout << "\n=== INVENTORY ===\n";
         const auto& ingredients = player_->stored_ingredients();
@@ -507,7 +520,7 @@ namespace potmaker {
         }
     }
 
-    auto game_state::get_user_choice(int min, int max) -> int
+    auto game_state::get_user_choice(const int min, const int max) -> int
     {
         int choice;
         while (true) {
@@ -529,16 +542,16 @@ namespace potmaker {
     }
 
     auto game_state::calculate_gold_reward(
-            const std::vector<enemy*>& defeated_enemies) -> double
+            const std::vector<enemy*>& defeated_enemies) const -> double
     {
         double total_reward = 0.0;
 
         for (const auto* enemy: defeated_enemies) {
-            // Base reward based on enemy level
-            double base_reward = 5.0 + (enemy->level() * 3.0);
+            // Base reward
+            const double base_reward = 5.0 + (enemy->level() * 3.0);
 
-            // Bonus for higher stages
-            double stage_bonus = current_stage_ * 2.0;
+            // Bonus
+            const double stage_bonus = current_stage_ * 2.0;
 
             total_reward += base_reward + stage_bonus;
         }
@@ -546,27 +559,27 @@ namespace potmaker {
         return total_reward * random_double(0.8, 1.2); // Add some variation
     }
 
-    // Factory functions
+    // Factories and Creation
     auto create_random_ingredient(int min_potency, int max_potency)
             -> ingredient*
     {
-        int type = random_int(0, 9); // 10 types of ingredients
-        int potency = random_int(min_potency, max_potency);
-        std::string name = get_random_ingredient_name(type);
+        const int type = random_int(0, 9); // 10 types of ingredients
+        const int potency = random_int(min_potency, max_potency);
+        const std::string name = get_random_ingredient_name(type);
 
         return create_ingredient_by_type(type, name, potency);
     }
 
-    auto create_random_enemy(int level) -> enemy*
+    auto create_random_enemy(const int level) -> enemy*
     {
-        int type = random_int(0, 8); // 9 types of enemies
-        std::string name = get_random_enemy_name(type);
+        const int type = random_int(0, 8);
+        const std::string name = get_random_enemy_name(type);
 
         return create_enemy_by_type(type, name, level);
     }
 
-    auto create_ingredient_by_type(int type, const std::string& name,
-                                   int potency) -> ingredient*
+    auto create_ingredient_by_type(const int type, const std::string& name,
+                                   const int potency) -> ingredient*
     {
         switch (type) {
         case 0:
@@ -594,10 +607,11 @@ namespace potmaker {
         }
     }
 
-    auto create_enemy_by_type(int type, const std::string& name,
-                              const int level)
-            -> enemy*
+    auto create_enemy_by_type(const int type, const std::string& name,
+                              const int level) -> enemy*
     {
+        // Cleanup is delegated to another method
+        // The freeing responsibility is being delegated
         switch (type) {
         case 0:
             return new flaming_enemy(name, level);
@@ -622,7 +636,7 @@ namespace potmaker {
         }
     }
 
-    auto get_random_ingredient_name(int type) -> std::string
+    auto get_random_ingredient_name(const int type) -> std::string
     {
         using namespace constants;
 
@@ -653,7 +667,7 @@ namespace potmaker {
         }
     }
 
-    auto get_random_enemy_name(int type) -> std::string
+    auto get_random_enemy_name(const int type) -> std::string
     {
         using namespace constants;
 

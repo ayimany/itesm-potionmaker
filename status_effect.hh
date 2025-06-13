@@ -12,6 +12,11 @@ namespace potmaker {
 
     class entity;
 
+    /**
+     * Modifies how an entity attacks, heals and receives damage
+     * throughout the game's course. May also deal damage per turn.
+     * @tparam element_t
+     */
     template<element_type element_t> class status_effect : public named {
     public:
         status_effect(std::string name, const int turns, const int potency,
@@ -20,21 +25,53 @@ namespace potmaker {
               turns_(turns), potency_(potency)
         {}
 
+        /**
+         * Transforms the healing received by the afflicted entity
+         * @param amt The original input healing
+         * @return The new healing value after being transformed
+         */
         virtual auto modify_healing(const double amt) -> double { return amt; }
+
+        /**
+         * Transforms the damage received by the afflicted entity
+         * @param amt The original input damage
+         * @return The new damage value after being transformed
+         */
         virtual auto modify_damage(const double amt) -> double { return amt; }
+
+        /**
+         * Transforms the attack dealt by the afflicted entity
+         * @param amt The original output attack
+         * @return The new attack value after being transformed
+         */
         virtual auto modify_attack(const double amt) -> double { return amt; }
 
+        /**
+         * Ticks down the turn timer
+         */
         auto tick() -> void { turns_--; }
 
+        /**
+         * @return The damage per turn this status effect deals
+         */
         [[nodiscard]] auto total_damage_per_turn() const -> double
         {
             return dmg_per_turn_ * potency_;
         }
 
+        /**
+         * @return How many turns this effect has left
+         */
         [[nodiscard]] auto turns_left() const -> int { return turns_; }
 
+        /**
+         * @return The numerical potency of this effect
+         */
         [[nodiscard]] auto potency() const -> int { return potency_; }
 
+        /**
+         * @return This status effect's type of element
+         */
         [[nodiscard]] static constexpr auto element() -> element_type
         {
             return element_t;

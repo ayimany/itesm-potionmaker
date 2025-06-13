@@ -13,12 +13,28 @@ namespace potmaker {
     template<element_type element_t> class status_effect;
     class entity;
 
+    /**
+     * Can be mixed into a potion to inflict special status effects on entities
+     */
     class ingredient : public named {
     public:
+        /**
+         * Constructs a new ingredient
+         * @param name The name of the ingredient
+         * @param potency The potency of the ingredient
+         */
         explicit ingredient(std::string name, std::int32_t potency);
 
+        /**
+         * Determines what happens to an entity when they are affected by a
+         * potion containing this ingredient
+         * @param e The afflicted entity
+         */
         virtual auto on_applied(entity& e) -> void = 0;
 
+        /**
+         * @return The numerical potency of this ingredient
+         */
         [[nodiscard]] auto potency() const -> std::int32_t;
 
     protected:
