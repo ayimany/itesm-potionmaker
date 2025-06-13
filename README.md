@@ -18,9 +18,9 @@ g++ -std=c++20 *.cc
 g++ -std=c++20 *.cc *.hh
 
 # Manual, beautifully listed out
-g++ -std=c++20 enemy_utils.cc entity.cc ingredient.cc ingredient_utils.cc menu_generation.cc potionmaker_game.cc status_effect.cc util.cc main.cc
+g++ -std=c++20 entity.cc ingredient.cc main.cc potionmaker_game.cc status_effect.cc util.cc
 # or
-g++ -std=c++20 enemy_utils.cc entity.cc ingredient.cc ingredient_utils.cc main.cc menu_generation.cc potionmaker_game.cc status_effect.cc util.cc dynamic_array.hh element_type.hh enemy_utils.hh entity.hh health_delta_inductor.hh ingredient.hh ingredient_utils.hh menu_generation.hh potionmaker_game.hh status_effect.hh util.hh
+g++ -std=c++20 entity.cc ingredient.cc main.cc potionmaker_game.cc status_effect.cc util.cc element_type.hh entity.hh entity_names.hh ingredient.hh ingredient_names.hh potionmaker_game.hh status_effect.hh util.hh
 
 ```
 
@@ -50,11 +50,15 @@ principles of polymorphism. Although forced, they are present in this project.
 ## Under which circumstances does it not work?
 
 If you don't wanna have fun, then it doesn't work. Apart from that, every
-aspect of the game should be tightly controlled and errors shouldn't be leaking.
-Can't say the same about memory though (Of course, I am joking).
+aspect of the game should be tightly controlled. Just don't input strings
+where you're being asked for numbers, please.
 
 ## UML Diagram
 
-Mmmh, standards
+Mmmh, standards.
+
+The UML diagram is far tool large to render in a single PNG in a README.
+Please check out the [PDF version](README.md).
+
 ![UML Diagram](UML-Diagram.png)
 
