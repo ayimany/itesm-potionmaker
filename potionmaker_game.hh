@@ -31,10 +31,13 @@ namespace potmaker {
         auto create_potion() -> std::vector<ingredient*>;
         auto apply_potion(const std::vector<ingredient*>& potion,
                           std::vector<enemy*>& enemies) -> void;
-        auto player_turn(std::vector<enemy*>& enemies) -> bool;
+        auto fight_round(std::vector<enemy*>& enemies, int initial_attack_type)
+                -> bool;
         auto enemy_turn(std::vector<enemy*>& enemies) -> void;
-        auto fight_round(std::vector<enemy*>& enemies) -> bool;
-        auto cleanup_dead_enemies(std::vector<enemy*>& enemies) -> void;
+        auto player_turn(std::vector<enemy*>& enemies, int attack_type) -> bool;
+        auto basic_attack(std::vector<enemy*>& enemies) -> void;
+
+        static auto cleanup_dead_enemies(std::vector<enemy*>& enemies) -> void;
         // Shop system
         auto generate_shop_items() -> void;
         auto display_shop() -> void;

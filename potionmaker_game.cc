@@ -108,24 +108,25 @@ namespace potmaker {
     {
         print_divider(std::format("STAGE {} BATTLE", current_stage_));
 
-        auto enemies = generate_enemies();
+        std::vector<enemy*> enemies = generate_enemies();
 
         std::cout << "You encounter:\n";
         display_enemies(enemies);
 
         std::cout << "\n1. Attack with Potion\n";
-        std::cout << "2. Run Away\n";
+        std::cout << "2. Basic Attack\n";
+        std::cout << "3. Run Away\n";
         std::cout << "Choose an action: ";
 
-        int choice = get_user_choice(1, 2);
+        int choice = get_user_choice(1, 3);
 
-        if (choice == 2) {
+        if (choice == 3) {
             std::cout << "You flee from the battle!\n";
             cleanup_enemies();
             return;
         }
 
-        bool battle_won = fight_round(enemies);
+        bool battle_won = fight_round(enemies, choice);
 
         if (battle_won) {
             double gold_reward = calculate_gold_reward(enemies);
@@ -221,6 +222,7 @@ namespace potmaker {
     {
         std::vector<ingredient*> potion;
         auto& inventory = player_->stored_ingredients();
+        std::vector<int> selected_indices;
 
         if (inventory.empty()) {
             std::cout << "You have no ingredients to make a potion!\n";
@@ -238,16 +240,32 @@ namespace potmaker {
 
             if (choice == 0) break;
 
-            auto* selected = inventory[choice - 1];
+            // Check if already selected
+            int actual_index = choice - 1;
+            if (std::find(selected_indices.begin(), selected_indices.end(),
+                          actual_index)
+                != selected_indices.end()) {
+                std::cout << "You already selected that ingredient!\n";
+                continue;
+            }
+
+            auto* selected = inventory[actual_index];
             potion.push_back(selected);
-            inventory.erase(inventory.begin() + choice - 1);
+            selected_indices.push_back(actual_index);
 
             std::cout << "Added " << selected->name() << " to potion!\n";
 
-            if (inventory.empty()) {
+            if (selected_indices.size() == inventory.size()) {
                 std::cout << "No more ingredients available!\n";
                 break;
             }
+        }
+
+        // Remove selected ingredients from inventory (in reverse order to
+        // maintain indices)
+        std::sort(selected_indices.rbegin(), selected_indices.rend());
+        for (int index: selected_indices) {
+            inventory.erase(inventory.begin() + index);
         }
 
         return potion;
@@ -261,26 +279,56 @@ namespace potmaker {
             return;
         }
 
-        print_action("You throw your potion!");
+        // Choose target enemy
+        std::cout << "\nChoose your target:\n";
+        display_enemies(enemies);
+        std::cout << "Target enemy (1-" << enemies.size() << "): ";
 
-        // Apply each ingredient to all enemies
+        int target_choice
+                = get_user_choice(1, static_cast<int>(enemies.size()));
+        enemy* target = enemies[target_choice - 1];
+
+        print_action(
+                std::format("You throw your potion at {}!", target->name()));
+
+        // Apply each ingredient to the chosen enemy
         for (auto* ingredient: potion) {
             std::cout << "\n" << ingredient->name() << " activates!\n";
-            for (auto* enemy: enemies) {
-                if (!enemy->is_dead()) { ingredient->on_applied(*enemy); }
-            }
+            if (!target->is_dead()) { ingredient->on_applied(*target); }
         }
     }
 
-    auto game_state::player_turn(std::vector<enemy*>& enemies) -> bool
+    auto game_state::player_turn(std::vector<enemy*>& enemies, int attack_type)
+            -> bool
     {
         std::cout << "\n=== YOUR TURN ===\n";
 
-        auto potion = create_potion();
-        apply_potion(potion, enemies);
+        if (attack_type == 1) { // Potion attack
+            auto& inventory = player_->stored_ingredients();
+
+            if (inventory.empty()) {
+                std::cout << "You have no ingredients to make a potion!\n";
+                std::cout << "1. Basic Attack\n";
+                std::cout << "2. Run Away\n";
+                std::cout << "Choose an action: ";
+
+                int fallback_choice = get_user_choice(1, 2);
+                if (fallback_choice == 2) {
+                    std::cout << "You flee from the battle!\n";
+                    return false; // Signal to end battle
+                }
+                basic_attack(enemies);
+            }
+            else {
+                auto potion = create_potion();
+                apply_potion(potion, enemies);
+            }
+        }
+        else if (attack_type == 2) { // Basic attack
+            basic_attack(enemies);
+        }
 
         cleanup_dead_enemies(enemies);
-
         return enemies.empty();
     }
 
@@ -300,12 +348,35 @@ namespace potmaker {
         cleanup_dead_enemies(enemies);
     }
 
-    auto game_state::fight_round(std::vector<enemy*>& enemies) -> bool
+    auto game_state::basic_attack(std::vector<enemy*>& enemies) -> void
     {
-        while (!enemies.empty() && !player_->is_dead()) {
+        // Choose target enemy
+        std::cout << "\nChoose your target:\n";
+        display_enemies(enemies);
+        std::cout << "Target enemy (1-" << enemies.size() << "): ";
+
+        int target_choice
+                = get_user_choice(1, static_cast<int>(enemies.size()));
+        enemy* target = enemies[target_choice - 1];
+
+        double damage = player_->damage() * random_double(0.8, 1.2);
+        print_action(std::format("You attack {} for {:.1f} damage!",
+                                 target->name(), damage));
+        target->modify_health(-damage);
+    }
+
+    auto game_state::fight_round(std::vector<enemy*>& enemies,
+                                 int initial_attack_type) -> bool
+    {
+        bool player_chose_to_flee = false;
+        while (!enemies.empty() && !player_->is_dead()
+               && !player_chose_to_flee) {
             // Player turn
-            bool player_won = player_turn(enemies);
+            bool player_won = player_turn(enemies, initial_attack_type);
             if (player_won) { return true; }
+            // Check if player chose to flee (enemies would be empty but in a
+            // different way)
+            if (enemies.empty()) { return true; }
 
             // Enemy turn
             enemy_turn(enemies);
@@ -322,23 +393,39 @@ namespace potmaker {
                 std::cout << "Enemies remaining:\n";
                 display_enemies(enemies);
             }
+
+            // For subsequent turns, give player choice again
+            if (!enemies.empty() && !player_->is_dead()) {
+                std::cout << "\n=== CHOOSE YOUR ACTION ===\n";
+                std::cout << "1. Attack with Potion\n";
+                std::cout << "2. Basic Attack\n";
+                std::cout << "3. Run Away\n";
+                std::cout << "Choose an action: ";
+
+                int choice = get_user_choice(1, 3);
+
+                if (choice == 3) {
+                    std::cout << "You flee from the battle!\n";
+                    player_chose_to_flee = true;
+                    return false;
+                }
+
+                initial_attack_type = choice;
+            }
         }
 
-        return !player_->is_dead();
+        return !player_->is_dead() && !player_chose_to_flee;
     }
 
     auto game_state::cleanup_dead_enemies(std::vector<enemy*>& enemies) -> void
     {
-        enemies.erase(
-                std::remove_if(enemies.begin(), enemies.end(),
-                               [](const enemy* e) { return e->is_dead(); }),
-                enemies.end());
+        std::erase_if(enemies, [](const enemy* e) { return e->is_dead(); });
     }
 
     auto game_state::generate_shop_items() -> void
     {
         // Clear existing items
-        for (auto& item: shop_items_) { delete item.item; }
+        for (const auto& item: shop_items_) { delete item.item; }
         shop_items_.clear();
 
         // Generate 6-8 random items
@@ -507,7 +594,8 @@ namespace potmaker {
         }
     }
 
-    auto create_enemy_by_type(int type, const std::string& name, int level)
+    auto create_enemy_by_type(int type, const std::string& name,
+                              const int level)
             -> enemy*
     {
         switch (type) {
