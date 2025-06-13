@@ -1,8 +1,7 @@
 #include "entity.hh"
-
 #include "status_effect.hh"
 #include "util.hh"
-
+#include <climits>
 #include <cmath>
 #include <cstdint>
 #include <format>
@@ -10,302 +9,478 @@
 #include <string_view>
 
 namespace potmaker {
-entity::entity(const std::string_view name, const element_type element,
-               const double max_health, const double health,
-               const double damage)
-    : status_effects_(0), element_(element), name_(name),
-      max_health_(max_health), health_(health), damage_(damage),
-      skips_turn_(false) {}
+    entity::entity(std::string name, const element_type element,
+                   const double max_health, const double damage)
+        : named(std::move(name)), element_(element), max_health_(max_health),
+          health_(max_health), damage_(damage), skips_turn_(false)
+    {}
 
-auto entity::on_turn_run() -> void {
-  dynamic_array<std::size_t> ticked_out_effects(0);
+    auto entity::tick() -> void
+    {
+        for (auto it = status_effects_.begin(); it != status_effects_.end();) {
+            try {
+                if (it->valueless_by_exception()) {
+                    it = status_effects_.erase(it);
+                    continue;
+                }
 
-  for (std::size_t i = 0; i < status_effects_.size(); i++) {
-    status_effect *effect = status_effects_[i];
+                std::visit(
+                        [this](auto&& effect) {
+                            const double damage
+                                    = effect.total_damage_per_turn();
+                            this->modify_health(-damage);
+                            effect.tick();
+                        },
+                        *it);
 
-    effect->tick();
-    effect->on_turn(this);
+                const bool should_remove = std::visit(
+                        [](const auto& effect) {
+                            return effect.turns_left() <= 0;
+                        },
+                        *it);
 
-    if (effect->turns() <= 0) {
-      ticked_out_effects.add(i);
-      delete effect;
+                if (should_remove) { it = status_effects_.erase(it); }
+                else {
+                    ++it;
+                }
+            }
+            catch (const std::bad_variant_access& e) {
+                it = status_effects_.erase(it);
+            }
+        }
     }
-  }
 
-  status_effects_.remove_bulk_indices(ticked_out_effects);
-
-  bool frozen = false;
-  for (const status_effect *effect : status_effects_) {
-    if (effect->element() == element_type::ice) {
-      frozen = true;
+    auto entity::modify_health(const double amount) -> void
+    {
+        health_ += amount;
     }
-  }
 
-  if (!frozen) {
-    skips_turn_ = false;
-  }
-}
-
-auto entity::name() const -> std::string_view { return name_; }
-
-auto entity::modify_health(health_delta_inductor *inductor, const double amount)
-    -> void {
-  double result = amount;
-  if (amount < 0) {
-    for (status_effect *effect : status_effects_) {
-      result = effect->transform_damage_taken(this, result);
+    auto entity::add_status_effect(status_effect_variant&& effect) -> void
+    {
+        if (!effect.valueless_by_exception()) {
+            status_effects_.emplace_back(std::move(effect));
+        }
     }
-  } else {
-    for (status_effect *effect : status_effects_) {
-      result = effect->transform_healing_received(this, result);
+
+    auto entity::clear_status_effects() -> void
+    {
+        status_effects_.clear();
     }
-  }
 
-  if (result < 0) {
-    print_action(std::format("{} has been hurt ({:.2f} HP) by {}", name_,
-                             result, inductor->inductor_display_string()));
-  } else if (result > 0) {
-    print_action(std::format("{} has been healed ({:.2f} HP) by {}", name_,
-                             result, inductor->inductor_display_string()));
-  }
-
-  health_ = std::min(health_ + result, max_health_);
-}
-
-auto entity::flag_skip() -> void { skips_turn_ = true; }
-
-auto entity::max_health() const -> double { return max_health_; }
-
-auto entity::health() const -> double { return health_; }
-
-auto entity::damage() const -> double {
-  double dmg = damage_;
-  for (status_effect *effect : status_effects_) {
-    dmg = effect->transform_attack_damage(this, dmg);
-  }
-
-  return dmg;
-}
-
-auto entity::is_skipping() const -> bool { return skips_turn_; }
-
-auto entity::element() const -> element_type { return element_; }
-
-auto entity::is_dead() const -> bool { return health_ <= 0; }
-
-auto entity::is_confused() const -> bool {
-  return status_effects_
-      .map<bool>([](status_effect *const &effect) {
-        return effect->element() == element_type::chaos;
-      })
-      .contains(true);
-}
-
-auto entity::status_effects() -> dynamic_array<status_effect *> & {
-  return status_effects_;
-}
-
-auto entity::add_status_effect(status_effect *effect) -> void {
-  status_effects_.add(effect);
-}
-
-auto entity::clear_status_effects() -> void {
-  // Since these effects will be passed in as allocations that later become our
-  // responsibility, we'll free them
-  for (const status_effect *effect : status_effects_) {
-    delete effect;
-  }
-
-  status_effects_.clear();
-}
-
-auto entity::pretty_string() -> std::string {
-  return std::format("{}, {:.2f} HP, {} Status Effects", name_, health_,
-                     status_effects_.size());
-}
-
-auto entity::inspection_string() const -> std::string {
-  std::stringstream ss;
-  ss << "Name: " << name_ << "\n";
-  ss << "Health: " << health_ << "\n";
-  ss << "Type: " << element_type_to_str(element()) << "\n";
-
-  if (status_effects_.size() > 0) {
-    ss << "Status Effects:\n";
-    for (const status_effect *effect : status_effects_) {
-      ss << "- " << effect->pretty_string() << " " << effect->description()
-         << "\n";
+    [[nodiscard]] auto entity::max_health() const -> double
+    {
+        return max_health_;
     }
-  }
-
-  return ss.str();
-}
-
-player::player(const std::string_view name, const double max_health_,
-               const double health, const double damage)
-    : entity(name, element_type::boring, max_health_, health, damage),
-      ingredients_(0), cash_(100) {}
-
-auto player::get_ingredients() -> dynamic_array<ingredient *> & {
-  return ingredients_;
-}
-
-auto player::add_ingredient(ingredient *ing) -> void { ingredients_.add(ing); }
-
-auto player::cash() const -> double { return cash_; }
-auto player::add_cash(const double cash) -> void { cash_ += cash; }
-auto player::subtract_cash(const double cash) -> void { cash_ -= cash; }
-
-auto player::inductor_display_string() -> std::string {
-  return std::format("The player, {}", name_);
-}
-
-enemy::enemy(const std::string_view name, const element_type element,
-             const std::uint16_t level, const double max_health,
-             const double health, const double damage, const bool affects_party)
-    : entity(name, element, max_health, health, damage), level_(level),
-      affects_party_(affects_party) {}
-
-auto enemy::attack(entity *e) -> void {
-  // Our health delta works with attack = -1; heal = 1, so the order is correct.
-  const double dmg = random_double(damage(), damage() / 2.0);
-  print_action(
-      std::format("{} attacks {} for {:.2f} damage", name_, e->name(), dmg));
-  e->modify_health(this, dmg);
-}
-
-auto enemy::act(player &p, dynamic_array<enemy *> &party) -> void {
-  if (skips_turn_) {
-    print_action(std::format("{} is frozen! Turn skipped.", name_));
-    return;
-  }
-
-  const bool confusion_roll = is_confused() && roll_chances(3);
-  const bool attacks = roll_chances(2);
-
-  if (attacks) {
-    if (confusion_roll) {
-      attack(this);
-    } else {
-      attack(&p);
+    [[nodiscard]] auto entity::health() const -> double
+    {
+        return health_;
     }
-  } else {
-    if (affects_party_ && confusion_roll ||
-        !affects_party_ && !confusion_roll) {
-      apply_effect(&p);
-    } else {
-      entity *entity = party[random_int(0, party.size() - 1)];
-      apply_effect(entity);
+    [[nodiscard]] auto entity::damage() const -> double
+    {
+        return damage_;
     }
-  }
-}
 
-auto enemy::level() const -> std::uint16_t { return level_; }
+    [[nodiscard]] auto entity::is_dead() const -> bool
+    {
+        return health_ <= 0;
+    }
 
-auto enemy::to_string() const -> std::string {
-  return std::format("{} - Level {}", name_, level_);
-}
+    [[nodiscard]] auto entity::is_frozen() const -> bool
+    {
+        for (const auto& effect_variant: status_effects_) {
+            try {
+                if (effect_variant.valueless_by_exception()) { continue; }
 
-auto enemy::inductor_display_string() -> std::string {
-  return std::format("The fiend, {}, LVL {}", name_, level_);
-}
+                const bool found_ice_effect = std::visit(
+                        [](const auto& effect) -> bool {
+                            return effect.element() == element_type::ice;
+                        },
+                        effect_variant);
 
-#define POTMK_ENEMY_CONSTRUCTOR(ctor_name, type, benevolent)                   \
-  ctor_name::ctor_name(const std::string_view &name,                           \
-                       const std::uint16_t level)                              \
-      : enemy(name, type, level, 50.0 + (level * 10), 50.0 + (level * 10),     \
-              -5.0 - (level * 2), benevolent) {}
+                if (found_ice_effect) { return true; }
+            }
+            catch (const std::bad_variant_access& e) {
+                continue; // which is basically unnecessary
+            }
+        }
+        return false;
+    }
 
-POTMK_ENEMY_CONSTRUCTOR(flaming_enemy, element_type::fire, false);
-POTMK_ENEMY_CONSTRUCTOR(chilling_enemy, element_type::ice, false);
-POTMK_ENEMY_CONSTRUCTOR(poisonous_enemy, element_type::nature, false);
-POTMK_ENEMY_CONSTRUCTOR(withering_enemy, element_type::underworld, false);
-POTMK_ENEMY_CONSTRUCTOR(healing_enemy, element_type::blessing, true);
-POTMK_ENEMY_CONSTRUCTOR(regenerative_enemy, element_type::holy, true);
-POTMK_ENEMY_CONSTRUCTOR(protective_enemy, element_type::earth, true);
-POTMK_ENEMY_CONSTRUCTOR(strengthening_enemy, element_type::blood, true);
-POTMK_ENEMY_CONSTRUCTOR(cleansing_enemy, element_type::purity, true);
-POTMK_ENEMY_CONSTRUCTOR(joker_enemy, element_type::chaos, false);
+    auto entity::status_effects() -> std::vector<status_effect_variant>&
+    {
+        return status_effects_;
+    }
 
-// There are better ways to do this, but we have to force polymorphism in a bit
-// for this project
+    // PLAYER
 
-auto flaming_enemy::apply_effect(entity *e) -> void {
-  status_effect *effect = new burning(2 * level_, level_);
-  print_action(std::format("{} burns {}", name_, e->name(), effect->turns(),
-                           effect->total_dpt()));
+    player::player(std::string name, const double max_health,
+                   const double damage, double const gold)
+        : entity(std::move(name), element_type::boring, max_health, damage),
+          gold_(gold)
+    {}
 
-  e->add_status_effect(effect);
-}
+    auto player::add_gold(const double gold) -> void
+    {
+        gold_ += gold;
+    }
 
-auto chilling_enemy::apply_effect(entity *e) -> void {
-  status_effect *effect = new frozen(std::ceil(0.25 * level_), level_);
-  print_action(std::format("{} freezes {}", name_, e->name(), effect->turns(),
-                           effect->total_dpt()));
+    auto player::remove_gold(const double gold) -> void
+    {
+        gold_ -= gold;
+    }
 
-  e->add_status_effect(effect);
-}
+    auto player::store_ingredient(ingredient* ing) -> void
+    {
+        stored_ingredients_.push_back(ing);
+    }
 
-auto poisonous_enemy::apply_effect(entity *e) -> void {
-  status_effect *effect = new poison(2 * level_, level_);
-  print_action(std::format("{} poisons {}", name_, e->name(), effect->turns(),
-                           effect->total_dpt()));
+    auto player::stored_ingredients() -> std::vector<ingredient*>&
+    {
+        return stored_ingredients_;
+    }
 
-  e->add_status_effect(effect);
-}
+    auto player::gold() const -> double
+    {
+        return gold_;
+    }
 
-auto withering_enemy::apply_effect(entity *e) -> void {
-  status_effect *effect = new wither(4 * level_, level_);
-  print_action(std::format("{} withers {}", name_, e->name(), effect->turns(),
-                           effect->total_dpt()));
+    // ENEMY
 
-  e->add_status_effect(effect);
-}
+    enemy::enemy(std::string name, const element_type element,
+                 const std::int32_t level, const double max_health,
+                 const double damage)
+        : entity(std::move(name), element, max_health, damage), level_(level)
+    {}
 
-auto healing_enemy::apply_effect(entity *e) -> void {
-  const double delta = 5.5 * level_;
+    auto enemy::level() const -> std::int32_t
+    {
+        return level_;
+    }
 
-  print_action(std::format("{} heals {}", name_, e->name(), delta));
+#define POTMK_ENEMY_CONSTRUCTOR(ctor_name, type, MAXHP, DMG)                   \
+    ctor_name::ctor_name(std::string name, const std::int32_t level)           \
+        : enemy(std::move(name), type, level, MAXHP, DMG)                      \
+    {}
 
-  e->modify_health(e, delta);
-}
+    // Flaming: Medium HP (80-120 range), Medium DMG (8-12 range)
+    POTMK_ENEMY_CONSTRUCTOR(
+            flaming_enemy, element_type::fire,
+            static_cast<uint16_t>(80 + (level * 4) * random_double(0.9, 1.1)),
+            static_cast<uint16_t>((8 + (level / 3))
+                                  * random_double(0.85, 1.15)));
 
-auto regenerative_enemy::apply_effect(entity *e) -> void {
-  status_effect *effect = new regeneration(2 * level_, level_);
-  print_action(std::format("{} applies regeneration to {}", name_, e->name(),
-                           effect->turns(), -effect->total_dpt()));
+    // Chilling: Low HP (50-80 range), Low DMG (4-7 range)
+    POTMK_ENEMY_CONSTRUCTOR(
+            chilling_enemy, element_type::ice,
+            static_cast<uint16_t>(50 + (level * 3) * random_double(0.85, 1.15)),
+            static_cast<uint16_t>((4 + (level / 4)) * random_double(0.8, 1.2)));
 
-  e->add_status_effect(effect);
-}
+    // Poison: Medium HP (70-100 range), Low DMG (5-8 range)
+    POTMK_ENEMY_CONSTRUCTOR(
+            poisonous_enemy, element_type::nature,
+            static_cast<uint16_t>(70 + (level * 3) * random_double(0.9, 1.1)),
+            static_cast<uint16_t>((5 + (level / 5))
+                                  * random_double(0.8, 1.15)));
 
-auto protective_enemy::apply_effect(entity *e) -> void {
-  status_effect *effect = new protection(4 * level_, level_);
-  print_action(
-      std::format("{} protects {}", name_, e->name(), effect->turns()));
+    // Wither: Low HP (40-70 range), High DMG (12-18 range)
+    POTMK_ENEMY_CONSTRUCTOR(
+            withering_enemy, element_type::underworld,
+            static_cast<uint16_t>(40 + (level * 3) * random_double(0.8, 1.2)),
+            static_cast<uint16_t>((12 + (level / 2))
+                                  * random_double(0.9, 1.15)));
 
-  e->add_status_effect(effect);
-}
+    // Healing: Low HP (50-80 range), Low DMG (3-6 range)
+    POTMK_ENEMY_CONSTRUCTOR(
+            healing_enemy, element_type::regenerating,
+            static_cast<uint16_t>(50 + (level * 3) * random_double(0.85, 1.15)),
+            static_cast<uint16_t>((3 + (level / 5))
+                                  * random_double(0.75, 1.25)));
 
-auto strengthening_enemy::apply_effect(entity *e) -> void {
-  status_effect *effect = new strength(2 * level_, level_);
-  print_action(
-      std::format("{} strengthens {}", name_, e->name(), effect->turns()));
+    // Regenerative: Low HP (50-80 range), Low DMG (3-6 range)
+    POTMK_ENEMY_CONSTRUCTOR(
+            regenerative_enemy, element_type::healing,
+            static_cast<uint16_t>(50 + (level * 3) * random_double(0.85, 1.15)),
+            static_cast<uint16_t>((3 + (level / 5))
+                                  * random_double(0.75, 1.25)));
 
-  e->add_status_effect(effect);
-}
+    // Protective: High HP (120-180 range), Medium DMG (7-10 range)
+    POTMK_ENEMY_CONSTRUCTOR(
+            protective_enemy, element_type::protective,
+            static_cast<uint16_t>(120 + (level * 6) * random_double(0.85, 1.1)),
+            static_cast<uint16_t>((7 + (level / 4)) * random_double(0.9, 1.1)));
 
-auto cleansing_enemy::apply_effect(entity *e) -> void {
-  print_action(std::format("{} cleanses {}", name_, e->name()));
+    // Strengthening: Low HP (40-60 range), High DMG (12-16 range)
+    POTMK_ENEMY_CONSTRUCTOR(
+            strengthening_enemy, element_type::strengthening,
+            static_cast<uint16_t>(40 + (level * 2) * random_double(0.8, 1.2)),
+            static_cast<uint16_t>((12 + (level / 3))
+                                  * random_double(0.85, 1.15)));
 
-  e->clear_status_effects();
-}
+    // Cleansing: Low HP (50-80 range), Low DMG (3-6 range)
+    POTMK_ENEMY_CONSTRUCTOR(
+            cleansing_enemy, element_type::purifying,
+            static_cast<uint16_t>(50 + (level * 3) * random_double(0.85, 1.15)),
+            static_cast<uint16_t>((3 + (level / 5))
+                                  * random_double(0.75, 1.25)));
 
-auto joker_enemy::apply_effect(entity *e) -> void {
-  status_effect *effect = new confused(2 * level_, level_);
-  print_action(
-      std::format("{} confuses {}", name_, e->name(), effect->turns()));
+    auto flaming_enemy::act(player& p, std::vector<enemy*>& party) -> void
+    {
+        // 40% chance to attempt burning (slightly more aggressive than the
+        // example)
+        if (roll_chances(5)) { // 20% chance for special behavior
+            // Sometimes spreads fire to multiple targets
+            if (roll_chances(3)) {
+                print_action(
+                        std::format("{} engulfs everyone in flames!", name_));
+                for (auto& target: party) {
+                    if (roll_chances(2)) { // 50% chance to affect each ally
+                        target->add_status_effect(
+                                burning(1 * level_, level_ / 2));
+                    }
+                }
+                p.add_status_effect(burning(2 * level_, level_));
+            } // Sometimes does a powerful burn
+            else {
+                print_action(std::format("{} unleashes a searing blaze on {}!",
+                                         name_, p.name()));
+                p.add_status_effect(burning(3 * level_, level_ * 1.5));
+            }
+        }
+        else if (roll_chances(2)) { // 50% chance for standard burn
+            print_action(std::format("{} scorches {}", name_, p.name()));
+            p.add_status_effect(burning(2 * level_, level_));
+            // Small chance to chain burn to adjacent enemies
+            if (roll_chances(5) && !party.empty()) {
+                size_t random_index = random_int(0, party.size() - 1);
+                print_action(std::format("The flames spread to {}!",
+                                         party[random_index]->name()));
+                party[random_index]->add_status_effect(
+                        burning(1 * level_, level_ / 2));
+            }
+        }
+        else { // Default attack (with fiery flavor)
+            print_action(std::format("{} attacks {} with burning fury!", name_,
+                                     p.name()));
+            // Burning enemies deal slightly more damage when not applying
+            // status
+            p.modify_health(-damage_ * 1.2);
+        }
+    }
 
-  e->add_status_effect(effect);
-}
+    // CHILLING ENEMY - Freezes often but can miss
+    auto chilling_enemy::act(player& p, std::vector<enemy*>& party) -> void
+    {
+        if (roll_chances(2)) { // 50% chance to try freezing
+            if (roll_chances(4)) { // 25% chance to actually hit
+                print_action(std::format("{} freezes {}", name_, p.name()));
+                p.add_status_effect(freezing(2 * level_, level_));
+            }
+            else {
+                print_action(std::format("{} attempts to freeze {} but misses!",
+                                         name_, p.name()));
+            }
+        }
+        else {
+            print_action(std::format("{} attacks {}", name_, p.name()));
+            p.modify_health(-damage_);
+        }
+    }
 
+    // POISONOUS ENEMY - Seeks to poison frequently
+    auto poisonous_enemy::act(player& p, std::vector<enemy*>& party) -> void
+    {
+        if (roll_chances(3)) { // 33% chance to poison
+            print_action(std::format("{} poisons {}", name_, p.name()));
+            p.add_status_effect(poison(3 * level_, level_));
+        }
+        else {
+            print_action(std::format("{} attacks {}", name_, p.name()));
+            p.modify_health(-damage_);
+        }
+    }
+
+    // WITHERING ENEMY - Occasionally withers
+    auto withering_enemy::act(player& p, std::vector<enemy*>& party) -> void
+    {
+        if (roll_chances(5)) { // 20% chance to wither
+            print_action(std::format("{} withers {}", name_, p.name()));
+            p.add_status_effect(wither(2 * level_, level_));
+        }
+        else {
+            print_action(std::format("{} attacks {}", name_, p.name()));
+            p.modify_health(-damage_);
+        }
+    }
+
+    // HEALING ENEMY - Focuses on healing most wounded ally
+    auto healing_enemy::act(player& p, std::vector<enemy*>& party) -> void
+    {
+        // Find most wounded ally
+        enemy* most_wounded = nullptr;
+        double lowest_health = 1.0;
+
+        for (auto& ally: party) {
+            if (ally != this) {
+                double health_percent = ally->health() / ally->max_health();
+                if (health_percent < lowest_health) {
+                    lowest_health = health_percent;
+                    most_wounded = ally;
+                }
+            }
+        }
+
+        // Heal if ally is below 50% health
+        if (most_wounded && lowest_health < 0.5 && !roll_chances(4)) {
+            double heal_amount = 10 + (level_ * 2);
+            print_action(std::format("{} heals {} for {:.1f} HP", name_,
+                                     most_wounded->name(), heal_amount));
+            most_wounded->modify_health(heal_amount);
+        }
+        else {
+            print_action(std::format("{} attacks {}", name_, p.name()));
+            p.modify_health(-damage_);
+        }
+    }
+
+    // REGENERATIVE ENEMY - Applies regeneration
+    auto regenerative_enemy::act(player& p, std::vector<enemy*>& party) -> void
+    {
+        // Find most wounded ally
+        enemy* most_wounded = nullptr;
+        double lowest_health = 1.0;
+
+        for (auto& ally: party) {
+            if (ally != this) {
+                const double health_percent
+                        = ally->health() / ally->max_health();
+                if (health_percent < lowest_health) {
+                    lowest_health = health_percent;
+                    most_wounded = ally;
+                }
+            }
+        }
+
+        if (most_wounded && lowest_health < 0.75 && !roll_chances(3)) {
+            print_action(std::format("{} regenerates {}", name_,
+                                     most_wounded->name()));
+            most_wounded->add_status_effect(regeneration(3 * level_, level_));
+        }
+        else {
+            print_action(std::format("{} attacks {}", name_, p.name()));
+            p.modify_health(-damage_);
+        }
+    }
+
+    // PROTECTIVE ENEMY - Frequently protects allies
+    auto protective_enemy::act(player& p, std::vector<enemy*>& party) -> void
+    {
+        if (roll_chances(2)) { // 50% chance to protect
+            // Find least protected ally
+            enemy* least_protected = nullptr;
+            int min_protection = INT_MAX;
+
+            for (auto& ally: party) {
+                if (ally != this) {
+                    int prot = 0;
+                    for (auto& effect: ally->status_effects()) {
+                        if (std::holds_alternative<protection>(effect)) {
+                            prot += std::get<protection>(effect).potency();
+                        }
+                    }
+                    if (prot < min_protection) {
+                        min_protection = prot;
+                        least_protected = ally;
+                    }
+                }
+            }
+
+            if (least_protected) {
+                print_action(std::format("{} protects {}", name_,
+                                         least_protected->name()));
+                least_protected->add_status_effect(
+                        protection(2 * level_, level_));
+            }
+            else {
+                p.modify_health(-damage_);
+            }
+        }
+        else {
+            print_action(std::format("{} attacks {}", name_, p.name()));
+            p.modify_health(-damage_);
+        }
+    }
+
+    // STRENGTHENING ENEMY - Occasionally strengthens allies
+    auto strengthening_enemy::act(player& p, std::vector<enemy*>& party) -> void
+    {
+        if (roll_chances(4)) { // 25% chance to strengthen
+            // Find ally with lowest strength
+            enemy* weakest = nullptr;
+            int min_strength = INT_MAX;
+
+            for (auto& ally: party) {
+                if (ally != this) {
+                    int strngth = 0;
+                    for (auto& effect: ally->status_effects()) {
+                        if (std::holds_alternative<strength>(effect)) {
+                            strngth += std::get<strength>(effect).potency();
+                        }
+                    }
+                    if (strngth < min_strength) {
+                        min_strength = strngth;
+                        weakest = ally;
+                    }
+                }
+            }
+
+            if (weakest) {
+                print_action(std::format("{} strengthens {}", name_,
+                                         weakest->name()));
+                weakest->add_status_effect(strength(3 * level_, level_));
+            }
+            else {
+                p.modify_health(-damage_);
+            }
+        }
+        else {
+            print_action(std::format("{} attacks {}", name_, p.name()));
+            p.modify_health(-damage_);
+        }
+    }
+
+    // CLEANSING ENEMY - Purifies negative effects
+    auto cleansing_enemy::act(player& p, std::vector<enemy*>& party) -> void
+    {
+        // Find ally with most negative effects
+        enemy* most_afflicted = nullptr;
+        int max_negative = 0;
+
+        for (auto& ally: party) {
+            if (ally != this) {
+                int negative_count = 0;
+                for (auto& effect: ally->status_effects()) {
+                    if (std::holds_alternative<burning>(effect)
+                        || std::holds_alternative<freezing>(effect)
+                        || std::holds_alternative<poison>(effect)
+                        || std::holds_alternative<wither>(effect)) {
+                        negative_count++;
+                    }
+                }
+                if (negative_count > max_negative) {
+                    max_negative = negative_count;
+                    most_afflicted = ally;
+                }
+            }
+        }
+
+        if (most_afflicted && max_negative > 0 && !roll_chances(3)) {
+            print_action(std::format("{} cleanses {}", name_,
+                                     most_afflicted->name()));
+            most_afflicted->clear_status_effects();
+        }
+        else {
+            print_action(std::format("{} attacks {}", name_, p.name()));
+            p.modify_health(-damage_);
+        }
+    }
 } // namespace potmaker

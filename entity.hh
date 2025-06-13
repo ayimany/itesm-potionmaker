@@ -1,157 +1,133 @@
 #ifndef ENTITY_HH
 #define ENTITY_HH
-#include "dynamic_array.hh"
 #include "element_type.hh"
-#include "health_delta_inductor.hh"
-
+#include "status_effect.hh"
+#include "util.hh"
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace potmaker {
 
-class status_effect;
-class ingredient;
+    template<element_type element_t> class status_effect;
+    class ingredient;
 
-class entity : virtual public health_delta_inductor {
-public:
-  explicit entity(std::string_view name, element_type element,
-                  double max_health, double health, double damage);
-  virtual ~entity() = default;
+    class entity : public named {
+    public:
+        explicit entity(std::string name, element_type element,
+                        double max_health, double damage);
 
-  auto on_turn_run() -> void;
+        auto tick() -> void;
 
-  [[nodiscard]] auto name() const -> std::string_view;
-  [[nodiscard]] auto max_health() const -> double;
-  [[nodiscard]] auto health() const -> double;
-  [[nodiscard]] auto damage() const -> double;
-  [[nodiscard]] auto is_skipping() const -> bool;
-  [[nodiscard]] auto element() const -> element_type;
-  [[nodiscard]] auto is_dead() const -> bool;
-  [[nodiscard]] auto is_confused() const -> bool;
-  [[nodiscard]] auto status_effects() -> dynamic_array<status_effect *> &;
-  [[nodiscard]] auto inspection_string() const -> std::string;
+        auto modify_health(const double amount) -> void;
 
-  auto modify_health(health_delta_inductor *inductor, double amount) -> void;
+        auto add_status_effect(status_effect_variant&& effect) -> void;
 
-  auto add_status_effect(status_effect *effect) -> void;
-  auto clear_status_effects() -> void;
+        auto clear_status_effects() -> void;
 
-  auto flag_skip() -> void;
+        [[nodiscard]] auto max_health() const -> double;
+        [[nodiscard]] auto health() const -> double;
+        [[nodiscard]] auto damage() const -> double;
+        [[nodiscard]] auto is_dead() const -> bool;
+        [[nodiscard]] auto is_frozen() const -> bool;
+        [[nodiscard]] auto status_effects()
+                -> std::vector<status_effect_variant>&;
 
-  auto pretty_string() -> std::string;
+    protected:
+        std::vector<status_effect_variant> status_effects_;
+        element_type element_;
+        std::string_view name_;
+        double max_health_;
+        double health_;
+        double damage_;
+        bool skips_turn_;
+    };
 
-protected:
-  dynamic_array<status_effect *> status_effects_;
-  element_type element_;
-  std::string_view name_;
-  double max_health_;
-  double health_;
-  double damage_;
-  bool skips_turn_;
-};
+    class player final : public entity {
+    public:
+        player(std::string name, double max_health, double damage, double gold);
 
-class player final : public entity {
-public:
-  player(std::string_view name, double max_health_, double health,
-         double damage);
+        auto add_gold(double gold) -> void;
+        auto remove_gold(double gold) -> void;
 
-  auto get_ingredients() -> dynamic_array<ingredient *> &;
-  auto add_ingredient(ingredient *ing) -> void;
-  [[nodiscard]] auto cash() const -> double;
-  auto add_cash(double cash) -> void;
-  auto subtract_cash(double cash) -> void;
+        auto store_ingredient(ingredient* ing) -> void;
 
-  auto inductor_display_string() -> std::string override;
+        [[nodiscard]] auto stored_ingredients() -> std::vector<ingredient*>&;
 
-private:
-  dynamic_array<ingredient *> ingredients_;
-  double cash_;
-};
+        [[nodiscard]] auto gold() const -> double;
 
-class enemy : public entity {
-public:
-  explicit enemy(std::string_view name, element_type element,
-                 std::uint16_t level, double max_health, double health,
-                 double damage, bool affects_party);
+    private:
+        std::vector<ingredient*> stored_ingredients_;
+        double gold_;
+    };
 
-  ~enemy() override = default;
+    class enemy : public entity {
+    public:
+        explicit enemy(std::string name, element_type element,
+                       std::int32_t level, double max_health, double damage);
 
-  auto attack(entity *e) -> void;
-  auto act(player &p, dynamic_array<enemy *> &party) -> void;
-  virtual auto apply_effect(entity *e) -> void = 0;
+        virtual auto act(player& p, std::vector<enemy*>& party) -> void = 0;
 
-  [[nodiscard]] auto level() const -> std::uint16_t;
-  [[nodiscard]] auto to_string() const -> std::string;
+        [[nodiscard]] auto level() const -> std::int32_t;
 
-  auto inductor_display_string() -> std::string override;
+    protected:
+        std::int32_t level_;
+    };
 
-protected:
-  std::uint16_t level_;
-  bool affects_party_;
-};
+    class flaming_enemy final : public enemy {
+    public:
+        explicit flaming_enemy(std::string name, std::int32_t level);
+        auto act(player& p, std::vector<enemy*>& party) -> void override;
+    };
 
-class flaming_enemy final : public enemy {
-public:
-  explicit flaming_enemy(std::string_view const &name, std::uint16_t level);
-  auto apply_effect(entity *e) -> void override;
-};
+    class chilling_enemy final : public enemy {
+    public:
+        explicit chilling_enemy(std::string name, std::int32_t level);
+        auto act(player& p, std::vector<enemy*>& party) -> void override;
+    };
 
-class chilling_enemy final : public enemy {
-public:
-  explicit chilling_enemy(std::string_view const &name, std::uint16_t level);
-  auto apply_effect(entity *e) -> void override;
-};
+    class poisonous_enemy final : public enemy {
+    public:
+        explicit poisonous_enemy(std::string name, std::int32_t level);
+        auto act(player& p, std::vector<enemy*>& party) -> void override;
+    };
 
-class poisonous_enemy final : public enemy {
-public:
-  explicit poisonous_enemy(std::string_view const &name, std::uint16_t level);
-  auto apply_effect(entity *e) -> void override;
-};
+    class withering_enemy final : public enemy {
+    public:
+        explicit withering_enemy(std::string name, std::int32_t level);
+        auto act(player& p, std::vector<enemy*>& party) -> void override;
+    };
 
-class withering_enemy final : public enemy {
-public:
-  explicit withering_enemy(std::string_view const &name, std::uint16_t level);
-  auto apply_effect(entity *e) -> void override;
-};
+    class healing_enemy final : public enemy {
+    public:
+        explicit healing_enemy(std::string name, std::int32_t level);
+        auto act(player& p, std::vector<enemy*>& party) -> void override;
+    };
 
-class healing_enemy final : public enemy {
-public:
-  explicit healing_enemy(std::string_view const &name, std::uint16_t level);
-  auto apply_effect(entity *e) -> void override;
-};
+    class regenerative_enemy final : public enemy {
+    public:
+        explicit regenerative_enemy(std::string name, std::int32_t level);
+        auto act(player& p, std::vector<enemy*>& party) -> void override;
+    };
 
-class regenerative_enemy final : public enemy {
-public:
-  explicit regenerative_enemy(std::string_view const &name,
-                              std::uint16_t level);
-  auto apply_effect(entity *e) -> void override;
-};
+    class protective_enemy final : public enemy {
+    public:
+        explicit protective_enemy(std::string name, std::int32_t level);
+        auto act(player& p, std::vector<enemy*>& party) -> void override;
+    };
 
-class protective_enemy final : public enemy {
-public:
-  explicit protective_enemy(std::string_view const &name, std::uint16_t level);
-  auto apply_effect(entity *e) -> void override;
-};
+    class strengthening_enemy final : public enemy {
+    public:
+        explicit strengthening_enemy(std::string name, std::int32_t level);
+        auto act(player& p, std::vector<enemy*>& party) -> void override;
+    };
 
-class strengthening_enemy final : public enemy {
-public:
-  explicit strengthening_enemy(std::string_view const &name,
-                               std::uint16_t level);
-  auto apply_effect(entity *e) -> void override;
-};
-
-class cleansing_enemy final : public enemy {
-public:
-  explicit cleansing_enemy(std::string_view const &name, std::uint16_t level);
-  auto apply_effect(entity *e) -> void override;
-};
-
-class joker_enemy final : public enemy {
-public:
-  explicit joker_enemy(std::string_view const &name, std::uint16_t level);
-  auto apply_effect(entity *e) -> void override;
-};
+    class cleansing_enemy final : public enemy {
+    public:
+        explicit cleansing_enemy(std::string name, std::int32_t level);
+        auto act(player& p, std::vector<enemy*>& party) -> void override;
+    };
 
 } // namespace potmaker
 

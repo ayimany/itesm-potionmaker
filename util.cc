@@ -2,8 +2,13 @@
 
 #include <iostream>
 #include <random>
+#include <utility>
 
 namespace potmaker {
+
+named::named(std::string name) : name_(std::move(name)) {}
+
+auto named::name() const -> std::string { return name_; }
 
 // Ideally, there would be a separate handler for these in class form
 // to avoid re-opening the random device.

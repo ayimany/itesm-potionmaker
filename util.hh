@@ -4,6 +4,17 @@
 
 namespace potmaker {
 
+class named {
+public:
+  virtual ~named() = default;
+  explicit named(std::string name);
+
+  [[nodiscard]] auto name() const -> std::string;
+
+protected:
+  std::string name_;
+};
+
 [[nodiscard]] auto random_int(int min, int max) -> int;
 [[nodiscard]] auto random_double(double min, double max) -> double;
 [[nodiscard]] auto roll_chances(int odds) -> bool;

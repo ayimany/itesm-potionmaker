@@ -10,17 +10,11 @@ add_executable(fuit_farm_2 main.cc
         entity.hh
         status_effect.cc
         status_effect.hh
-        dynamic_array.hh
-        menu_generation.hh
-        menu_generation.cc
-        ingredient_utils.hh
+        ingredient_names.hh
         util.cc
         util.hh
-        ingredient_utils.cc
         potionmaker_game.cc
         potionmaker_game.hh
-        enemy_utils.cc
-        enemy_utils.hh
+        entity_names.hh
         element_type.hh
-        health_delta_inductor.hh
 )
