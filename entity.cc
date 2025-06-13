@@ -28,7 +28,7 @@ namespace potmaker {
                         [this](auto&& effect) {
                             const double damage
                                     = effect.total_damage_per_turn();
-                            this->modify_health(-damage);
+                            this->modify_health(damage);
                             effect.tick();
                         },
                         *it);
@@ -263,7 +263,7 @@ namespace potmaker {
                                      p.name()));
             // Burning enemies deal slightly more damage when not applying
             // status
-            p.modify_health(-damage_ * 1.2);
+            p.modify_health(damage_ * 1.2);
         }
     }
 
@@ -282,7 +282,7 @@ namespace potmaker {
         }
         else {
             print_action(std::format("{} attacks {}", name_, p.name()));
-            p.modify_health(-damage_);
+            p.modify_health(damage_);
         }
     }
 
@@ -295,7 +295,7 @@ namespace potmaker {
         }
         else {
             print_action(std::format("{} attacks {}", name_, p.name()));
-            p.modify_health(-damage_);
+            p.modify_health(damage_);
         }
     }
 
@@ -308,7 +308,7 @@ namespace potmaker {
         }
         else {
             print_action(std::format("{} attacks {}", name_, p.name()));
-            p.modify_health(-damage_);
+            p.modify_health(damage_);
         }
     }
 
@@ -338,7 +338,7 @@ namespace potmaker {
         }
         else {
             print_action(std::format("{} attacks {}", name_, p.name()));
-            p.modify_health(-damage_);
+            p.modify_health(damage_);
         }
     }
 
@@ -367,7 +367,7 @@ namespace potmaker {
         }
         else {
             print_action(std::format("{} attacks {}", name_, p.name()));
-            p.modify_health(-damage_);
+            p.modify_health(damage_);
         }
     }
 
@@ -401,12 +401,13 @@ namespace potmaker {
                         protection(2 * level_, level_));
             }
             else {
-                p.modify_health(-damage_);
+                print_action(std::format("{} attacks {}", name_, p.name()));
+                p.modify_health(damage_);
             }
         }
         else {
             print_action(std::format("{} attacks {}", name_, p.name()));
-            p.modify_health(-damage_);
+            p.modify_health(damage_);
         }
     }
 
@@ -439,12 +440,13 @@ namespace potmaker {
                 weakest->add_status_effect(strength(3 * level_, level_));
             }
             else {
-                p.modify_health(-damage_);
+                print_action(std::format("{} attacks {}", name_, p.name()));
+                p.modify_health(damage_);
             }
         }
         else {
             print_action(std::format("{} attacks {}", name_, p.name()));
-            p.modify_health(-damage_);
+            p.modify_health(damage_);
         }
     }
 
@@ -480,7 +482,7 @@ namespace potmaker {
         }
         else {
             print_action(std::format("{} attacks {}", name_, p.name()));
-            p.modify_health(-damage_);
+            p.modify_health(damage_);
         }
     }
 } // namespace potmaker

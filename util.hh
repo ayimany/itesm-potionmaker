@@ -4,22 +4,23 @@
 
 namespace potmaker {
 
-class named {
-public:
-  virtual ~named() = default;
-  explicit named(std::string name);
+    class named {
+    public:
+        virtual ~named() = default;
+        explicit named(std::string name);
 
-  [[nodiscard]] auto name() const -> std::string;
+        [[nodiscard]] auto name() const -> std::string;
 
-protected:
-  std::string name_;
-};
+    protected:
+        std::string name_;
+    };
 
-[[nodiscard]] auto random_int(int min, int max) -> int;
-[[nodiscard]] auto random_double(double min, double max) -> double;
-[[nodiscard]] auto roll_chances(int odds) -> bool;
-auto print_action(const std::string &act) -> void;
-auto print_divider(const std::string &act) -> void;
+    [[nodiscard]] auto random_int(int min, int max) -> int;
+    [[nodiscard]] auto random_double(double min, double max) -> double;
+    [[nodiscard]] auto roll_chances(int odds) -> bool;
+    auto print_action(const std::string& act) -> void;
+    auto print_divider(const std::string& act) -> void;
+    auto print_special(const std::string& act) -> void;
 
 } // namespace potmaker
 
