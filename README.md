@@ -12,6 +12,9 @@ that you are **compiling under C++20**.
 ### Method 1: Globbing or Manual
 
 ```shell
+# First change your directory to src
+cd src
+
 # Globbing
 g++ -std=c++20 *.cc
 # or
@@ -58,7 +61,7 @@ where you're being asked for numbers, please.
 Mmmh, standards.
 
 The UML diagram is far tool large to render in a single PNG in a README.
-Please check out the [PDF version](README.md).
+**Please check out the [PDF version](resources/UML-Diagram.pdf)**.
 
-![UML Diagram](UML-Diagram.png)
+![UML Diagram](resources/UML-Diagram.png)
 

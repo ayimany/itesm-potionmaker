@@ -3,18 +3,18 @@ project(potion-maker)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(fuit_farm_2 main.cc
-        ingredient.cc
-        ingredient.hh
-        entity.cc
-        entity.hh
-        status_effect.cc
-        status_effect.hh
-        ingredient_names.hh
-        util.cc
-        util.hh
-        potionmaker_game.cc
-        potionmaker_game.hh
-        entity_names.hh
-        element_type.hh
+add_executable(fuit_farm_2 src/main.cc
+        src/ingredient.cc
+        src/ingredient.hh
+        src/entity.cc
+        src/entity.hh
+        src/status_effect.cc
+        src/status_effect.hh
+        src/ingredient_names.hh
+        src/util.cc
+        src/util.hh
+        src/potionmaker_game.cc
+        src/potionmaker_game.hh
+        src/entity_names.hh
+        src/element_type.hh
 )
